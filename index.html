@@ -116,6 +116,7 @@ textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;bord
     </div>
     <div class="speed"><label for="rate">Vitesse de la voix</label><input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="0.85"><span id="rateVal"></span></div>
     <p class="hint">Touche un mot pour l'entendre seul. Une phrase est réussie à partir de 85 %.</p>
+    <p class="hint" id="engineStatus"></p>
   </section>
 
   <section id="viewEnd" class="card" hidden>
@@ -132,6 +133,11 @@ textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;bord
   <section id="viewList" class="card" hidden>
     <p class="hint">Choisis ce que tu veux travailler. Après la dernière leçon, le coach te donne des phrases nouvelles, sans fin.</p>
     <div class="list" id="lessonList"></div>
+    <div class="speed"><label for="engine">Moteur d'écoute</label>
+      <select id="engine" class="btn small" style="flex:1">
+        <option value="whisper">Whisper (précis, recommandé)</option>
+        <option value="google">Google (rapide, plus strict)</option>
+      </select></div>
   </section>
 
   <section id="viewScript" class="card" hidden>
@@ -404,13 +410,63 @@ function startRec(){
   setRec(true);
   try{ listenOnce(); }catch(e){ setRec(false); $("heard").textContent="Le micro n'a pas démarré. Réessaie."; }
 }
+/* ---------- Whisper: records the voice, then the same engine as the PC tests reads it, inside the phone ---------- */
+let engine = store.get("coach_engine","whisper");
+let mr=null, mrStream=null, mrTimer=null, busy=false;
+function engineStatus(t){ $("engineStatus").textContent=t; }
+function decodeTo16k(ab){
+  const AC=window.AudioContext||window.webkitAudioContext; const ac=new AC();
+  return ac.decodeAudioData(ab).then(buf=>{ ac.close&&ac.close();
+    const off=new OfflineAudioContext(1, Math.max(1,Math.ceil(buf.duration*16000)), 16000);
+    const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start();
+    return off.startRendering(); }).then(r=>r.getChannelData(0));
+}
+async function analyse(blob){
+  busy=true; $("btnRec").disabled=true; btnLabel("⏳ Analyse…");
+  $("heard").textContent = window.WH && WH.ready ? "Analyse de ta voix…" : "Le coach finit de se préparer, puis il analyse ta voix…";
+  try{
+    const audio = await decodeTo16k(await blob.arrayBuffer());
+    if(audio.length < 16000*0.4){ throw new Error("court"); }
+    const text = await WH.transcribe(audio);
+    heardText = text.replace(/\[.*?\]|\(.*?\)/g," ").trim();
+    showResult();
+  }catch(e){
+    $("heard").textContent = e && e.message==="court" ? "L'enregistrement est trop court. Appuie sur « Parler », lis la phrase, puis « J'ai fini »." : "L'analyse a échoué. Réessaie (il faut Internet la première fois).";
+  }
+  busy=false; $("btnRec").disabled=false; btnLabel("🎙 Parler");
+}
+async function recordWhisper(){
+  if(busy) return;
+  if(recording){ clearTimeout(mrTimer); try{ mr.stop(); }catch(e){} return; }
+  if(!window.WH){ $("heard").textContent="Le moteur Whisper n'a pas pu se charger. Vérifie Internet, ou choisis Google dans « Toutes les leçons »."; return; }
+  if("speechSynthesis" in window) speechSynthesis.cancel();
+  $("result").hidden=true; $("sentence").querySelectorAll(".w").forEach(sp=>sp.classList.remove("ok","bad"));
+  $("heard").textContent="⏳ J'ouvre le micro… attends le signal vert.";
+  try{ mrStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }
+  catch(e){ $("heard").textContent="Le micro est refusé. Touche le cadenas à gauche de l'adresse, puis Autorisations, et active le micro."; return; }
+  const chunks=[]; mr=new MediaRecorder(mrStream);
+  mr.ondataavailable=e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+  mr.onstart=()=>{ setRec(true); btnLabel("⏹ J'ai fini"); $("heard").textContent="🟢 Parle maintenant ! Appuie sur « J'ai fini » à la fin."; };
+  mr.onstop=()=>{ mrStream.getTracks().forEach(t=>t.stop()); setRec(false); analyse(new Blob(chunks,{type:mr.mimeType||"audio/webm"})); };
+  mr.start();
+  mrTimer=setTimeout(()=>{ if(recording) try{ mr.stop(); }catch(e){} }, 30000);
+}
+window.onWhisperProgress = (pct, ready, err)=>{
+  if(engine!=="whisper") return engineStatus("");
+  if(err) return engineStatus("Whisper n'a pas pu se charger (Internet ?). Recharge la page, ou choisis Google dans « Toutes les leçons ».");
+  engineStatus(ready ? "Écoute : Whisper, prêt ✓" : `Préparation de l'écoute Whisper : ${pct} % (seulement la 1re fois, environ 80 Mo, de préférence en Wi-Fi)`);
+};
+$("engine").value=engine;
+$("engine").onchange=e=>{ engine=e.target.value; store.set("coach_engine",engine); if(engine==="whisper"){ window.WH&&WH.load(); } else engineStatus("Écoute : Google"); };
+
 $("btnRec").onclick=()=>{
+  if(engine==="whisper") return recordWhisper();
   if(!SR) return;
   if(recording){ userStop=true; try{ rec.stop(); }catch(e){ finish(); return; }
     setTimeout(()=>{ if(recording && userStop) finish(); }, 1500); return; }
   startRec();
 };
-if(!SR){ $("btnRec").disabled=true; const w=$("warnMic"); w.hidden=false;
+if(!SR && !(navigator.mediaDevices && window.MediaRecorder)){ $("btnRec").disabled=true; const w=$("warnMic"); w.hidden=false;
   w.textContent="Ce navigateur ne sait pas écouter. Ouvre cette page dans Google Chrome sur ton téléphone Android. Tu peux quand même écouter les phrases ici."; }
 
 /* ---------- buttons ---------- */
@@ -430,6 +486,38 @@ $("btnClear").onclick=()=>{ $("scriptBox").value=""; };
 $("btnUse").onclick=()=>{ const v=$("scriptBox").value.trim(); if(!v) return; script=v; store.set("coach_script",v); state.mode="script"; state.part=0; state.i=0; render(); };
 
 render();
+</script>
+<script type="module">
+// Whisper (base.en) running inside the phone. Downloaded once, then kept by the browser.
+let asr=null, loading=null;
+const files={};
+function report(err){
+  const t=Object.values(files).reduce((a,f)=>a+(f.total||0),0), l=Object.values(files).reduce((a,f)=>a+(f.loaded||0),0);
+  window.onWhisperProgress && window.onWhisperProgress(t?Math.min(99,Math.round(100*l/t)):0, !!asr, err);
+}
+window.WH = {
+  get ready(){ return !!asr; },
+  load(){
+    if(!loading){
+      loading = import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1").then(({pipeline, env})=>{
+        env.allowLocalModels=false;
+        return pipeline("automatic-speech-recognition","Xenova/whisper-base.en",{dtype:"q8",
+          progress_callback:p=>{ if(p.file && (p.status==="progress"||p.status==="done")){ files[p.file]={loaded:p.status==="done"?(files[p.file]?.total||p.loaded||1):p.loaded,total:p.total||files[p.file]?.total||1}; report(); } }});
+      }).then(p=>{ asr=p; report(); return p; })
+        .catch(e=>{ loading=null; report(true); throw e; });
+    }
+    return loading;
+  },
+  async transcribe(audio){
+    const p = asr || await this.load();
+    const out = await p(audio, {chunk_length_s:30});
+    return (out && out.text) || "";
+  }
+};
+if((function(){ try{ return JSON.parse(localStorage.getItem("coach_engine")||'"whisper"'); }catch(e){ return "whisper"; } })()==="whisper"){
+  window.onWhisperProgress && window.onWhisperProgress(0,false,false);
+  window.WH.load().catch(()=>{});
+}
 </script>
 </body>
 </html>
