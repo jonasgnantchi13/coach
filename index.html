@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Coach de prononciation</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0f7a55">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#eef2f0; --card:#ffffff; --fg:#14211c; --muted:#5d6d66; --line:#d5ddd9;
+  --accent:#0f7a55; --accent-ink:#ffffff; --tip:#e6f1ec;
+  --ok:#137a3a; --ok-bg:#dcf3e4; --bad:#b3261e; --bad-bg:#fbe1de; --live:#8a6d00;
+  --display:"Poppins",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f1714; --card:#17221e; --fg:#eaf2ee; --muted:#9db0a8; --line:#2a3832;
+  --accent:#3fcf94; --accent-ink:#06130d; --tip:#1d2e27;
+  --ok:#5fe39a; --ok-bg:#163a27; --bad:#ff8a80; --bad-bg:#43201d; --live:#f2cf5b; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.45;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:720px;margin:0 auto;padding-block:14px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--display);font-size:1.2rem;margin:0;font-weight:700}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{font:600 .9rem var(--body);padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg)}
+.tabs button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.warn{background:var(--bad-bg);border-radius:12px;padding:12px 14px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:16px}
+.lessonhead{display:flex;flex-direction:column;gap:6px}
+.lessontitle{font-family:var(--display);font-weight:700;font-size:1.05rem}
+.tip{background:var(--tip);border-radius:10px;padding:8px 12px;font-size:.95rem}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.count{display:flex;justify-content:space-between;color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.sentence{font-family:var(--display);font-weight:600;font-size:clamp(1.7rem,7vw,2.4rem);line-height:1.35;margin:0;text-wrap:balance}
+.w{border-radius:8px;padding:0 .12em;cursor:pointer}
+.w.ok{background:var(--ok-bg);color:var(--ok)}
+.w.bad{background:var(--bad-bg);color:var(--bad);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+.heard{font-size:1rem;color:var(--muted);min-height:1.5em}
+.heard b{color:var(--fg);font-weight:600}
+.heard .live{color:var(--live)}
+.score{font-family:var(--display);font-size:1.15rem;font-weight:600}
+.fixes{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.fixes li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bad-bg);border-radius:12px;padding:10px 12px}
+.fixes .say{font-family:var(--display);font-size:1.3rem;font-weight:700;color:var(--bad)}
+.fixes small{color:var(--muted);font-size:.9rem}
+.fixes button{margin-left:auto}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{font:600 1.05rem var(--body);min-height:58px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:8px 12px}
+.btn.main{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-size:1.2rem;min-height:70px}
+.btn.main.rec{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.45}
+.btn.small{min-height:44px;font-size:.95rem;border-radius:10px}
+.btn:focus-visible,.tabs button:focus-visible,.w:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.nav{display:flex;gap:10px}
+.nav .btn{flex:1}
+.list{display:flex;flex-direction:column;gap:8px}
+.list button{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;font:500 1rem var(--body);padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.list button .st{font-size:.85rem;color:var(--muted);white-space:nowrap}
+.list button.done .st{color:var(--ok);font-weight:600}
+.list button.cur{border-color:var(--accent);border-width:2px}
+textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.hint{color:var(--muted);font-size:.92rem;margin:0}
+.speed{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.92rem}
+.speed input{flex:1}
+.big{font-family:var(--display);font-size:2.2rem;font-weight:700;margin:0}
+@media (prefers-reduced-motion:no-preference){.btn.main.rec{animation:pulse 1.4s ease-in-out infinite}}
+@keyframes pulse{50%{opacity:.8}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Coach de prononciation</h1>
+    <div class="tabs">
+      <button id="tabTrain" aria-pressed="true">Leçon</button>
+      <button id="tabList" aria-pressed="false">Toutes les leçons</button>
+      <button id="tabScript" aria-pressed="false">Mon script</button>
+    </div>
+  </header>
+
+  <div id="warnMic" class="warn" hidden></div>
+
+  <section id="viewTrain" class="card">
+    <div class="lessonhead">
+      <div class="count"><span id="lessonNum"></span><span id="pos"></span></div>
+      <div class="lessontitle" id="lessonTitle"></div>
+      <div class="tip" id="lessonTip"></div>
+      <div class="bar"><i id="barFill"></i></div>
+    </div>
+    <p id="sentence" class="sentence"></p>
+    <div class="heard" id="heard"></div>
+    <div id="result" hidden>
+      <div class="score" id="score"></div>
+      <ul class="fixes" id="fixes"></ul>
+    </div>
+    <div class="actions">
+      <button class="btn main" id="btnRec">🎙 Parler</button>
+      <button class="btn" id="btnListen">🔊 Écouter</button>
+      <button class="btn" id="btnSlow">🐢 Lentement</button>
+    </div>
+    <div class="nav">
+      <button class="btn small" id="btnPrev">← Précédente</button>
+      <button class="btn small" id="btnNext">Suivante →</button>
+    </div>
+    <div class="speed"><label for="rate">Vitesse de la voix</label><input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="0.85"><span id="rateVal"></span></div>
+    <p class="hint">Touche un mot pour l'entendre seul. Une phrase est réussie à partir de 85 %.</p>
+  </section>
+
+  <section id="viewEnd" class="card" hidden>
+    <div class="lessontitle" id="endTitle"></div>
+    <p class="big" id="endScore"></p>
+    <p class="hint" id="endMsg"></p>
+    <div class="nav" style="flex-direction:column">
+      <button class="btn go" id="btnNextLesson">Leçon suivante →</button>
+      <button class="btn" id="btnRetryMissed">Refaire les phrases ratées</button>
+      <button class="btn" id="btnRestart">Refaire toute la leçon</button>
+    </div>
+  </section>
+
+  <section id="viewList" class="card" hidden>
+    <p class="hint">Choisis une leçon. Après la dernière, le coach te donne des phrases au hasard, sans fin.</p>
+    <div class="list" id="lessonList"></div>
+  </section>
+
+  <section id="viewScript" class="card" hidden>
+    <p class="hint">Colle ici le script de ta prochaine vidéo, en anglais. Il devient une leçon : 10 phrases à la fois, jusqu'à la fin du texte.</p>
+    <textarea id="scriptBox" aria-label="Script en anglais"></textarea>
+    <div class="nav">
+      <button class="btn small" id="btnClear">Effacer</button>
+      <button class="btn small go" id="btnUse">M'entraîner sur ce script</button>
+    </div>
+  </section>
+</div>
+
+<script src="phrases.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v) }catch(e){ return d } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)) }catch(e){} }
+};
+const LESSONS = window.LESSONS;
+
+/* ---------- state ---------- */
+let state = store.get("coach_state", {lesson:0, i:0, mode:"lesson"});
+let results = store.get("coach_results", {});   // key -> best %
+let script = store.get("coach_script", "");
+let rate = store.get("coach_rate", 0.85);
+let current = {title:"",focus:"",s:[]};          // sentences being trained now
+let heardText = "", recording = false, rec = null;
+
+function save(){ store.set("coach_state", state); store.set("coach_results", results); }
+function splitSentences(t){
+  return t.replace(/\s+/g," ").trim().split(/(?<=[.!?])\s+(?=[A-Z0-9"'“])/).map(s=>s.trim()).filter(Boolean);
+}
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a; }
+
+function buildCurrent(){
+  if(state.mode==="script"){
+    const all = splitSentences(script);
+    const part = state.part||0;
+    current = {title:`Mon script : partie ${part+1} / ${Math.max(1,Math.ceil(all.length/10))}`, focus:"Lis comme dans ta vraie vidéo : calme, et chaque fin de mot bien nette.", s:all.slice(part*10, part*10+10)};
+  } else if(state.mode==="retry"){
+    current = {title:"Phrases ratées", focus:"Réécoute chaque phrase avant de la lire.", s:state.retry||[]};
+  } else if(state.mode==="mix"){
+    if(!state.mix || !state.mix.length){ state.mix = shuffle(LESSONS.flatMap(l=>l.s)).slice(0,10); }
+    current = {title:"Révision au hasard", focus:"10 phrases tirées de toutes les leçons. Une nouvelle série arrive à la fin.", s:state.mix};
+  } else {
+    const L = LESSONS[state.lesson] || LESSONS[0];
+    current = {title:L.title, focus:L.focus, s:L.s};
+  }
+  if(!current.s.length){ state.mode="lesson"; state.lesson=0; state.i=0; return buildCurrent(); }
+  if(state.i >= current.s.length) state.i = 0;
+}
+function lessonLabel(){
+  if(state.mode==="lesson") return `Leçon ${state.lesson+1} / ${LESSONS.length}`;
+  if(state.mode==="mix") return "Révision";
+  if(state.mode==="retry") return "Rattrapage";
+  return "Mon script";
+}
+
+/* ---------- compare ---------- */
+const norm = w => w.toLowerCase().replace(/[’]/g,"'").replace(/[^a-z0-9']/g,"");
+const NUM = {"0":"zero","1":"one","2":"two","3":"three","4":"four","5":"five","6":"six","7":"seven","8":"eight","9":"nine","10":"ten","11":"eleven","12":"twelve","13":"thirteen","15":"fifteen","19":"nineteen","30":"thirty","50":"fifty","90":"ninety"};
+const EXPAND = {"it's":["it","is"],"that's":["that","is"],"here's":["here","is"],"there's":["there","is"],"what's":["what","is"],"he's":["he","is"],"she's":["she","is"],"let's":["let","us"],"i'm":["i","am"],"i'll":["i","will"],"you'll":["you","will"],"we'll":["we","will"],"i've":["i","have"],"won't":["will","not"],"don't":["do","not"],"can't":["can","not"],"couldn't":["could","not"],"isn't":["is","not"],"doesn't":["does","not"],"didn't":["did","not"],"we're":["we","are"],"they're":["they","are"],"you're":["you","are"]};
+function toks(word){ let n=norm(word); if(NUM[n]) n=NUM[n]; return EXPAND[n] || [n]; }
+function compare(words, heard){
+  const exp=[]; words.forEach((w,i)=>toks(w).forEach(t=>{ if(t) exp.push({t,i}) }));
+  const hw=[]; heard.split(/\s+/).forEach(w=>toks(w).forEach(t=>{ if(t) hw.push(t) }));
+  const n=exp.length, m=hw.length, dp=Array.from({length:n+1},()=>new Int16Array(m+1));
+  for(let a=n-1;a>=0;a--) for(let b=m-1;b>=0;b--) dp[a][b] = exp[a].t===hw[b] ? dp[a+1][b+1]+1 : Math.max(dp[a+1][b],dp[a][b+1]);
+  const hit=new Array(n).fill(false), pairs=[]; let a=0,b=0;
+  while(a<n&&b<m){ if(exp[a].t===hw[b]){hit[a]=true;pairs.push([a,b]);a++;b++} else if(dp[a+1][b]>=dp[a][b+1]) a++; else b++; }
+  const ok = words.map((_,i)=>exp.every((e,k)=>e.i!==i||hit[k]));
+  const said = words.map(()=>""); let prevB=-1;
+  for(let x=0;x<n;x++){ const p=pairs.find(q=>q[0]===x); if(p){prevB=p[1];continue}
+    const nx=pairs.find(q=>q[0]>x); const end=nx?nx[1]:m; if(!said[exp[x].i]) said[exp[x].i]=hw.slice(prevB+1,end).join(" "); }
+  return {ok,said};
+}
+const key = s => "k"+[...s].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0);
+
+/* ---------- render ---------- */
+function show(view){
+  for(const v of ["Train","End","List","Script"]) $("view"+v).hidden = v!==view;
+  $("tabTrain").setAttribute("aria-pressed", view==="Train"||view==="End");
+  $("tabList").setAttribute("aria-pressed", view==="List");
+  $("tabScript").setAttribute("aria-pressed", view==="Script");
+}
+function render(){
+  buildCurrent();
+  const s = current.s[state.i];
+  $("lessonNum").textContent = lessonLabel();
+  $("pos").textContent = `Phrase ${state.i+1} / ${current.s.length}`;
+  $("lessonTitle").textContent = current.title;
+  $("lessonTip").textContent = current.focus;
+  const done = current.s.filter(x=>(results[key(x)]||0)>=85).length;
+  $("barFill").style.width = (100*done/current.s.length)+"%";
+  const words = s.split(" "); const el=$("sentence"); el.textContent="";
+  words.forEach((w,i)=>{ const sp=document.createElement("span"); sp.className="w"; sp.tabIndex=0; sp.textContent=w;
+    sp.onclick=()=>say(w.replace(/[^A-Za-z0-9'’-]/g,""),0.7); el.append(sp, document.createTextNode(i<words.length-1?" ":"")); });
+  const best = results[key(s)];
+  $("heard").textContent = best!=null ? `Ton meilleur score sur cette phrase : ${best} %` : "Écoute d'abord la phrase, puis appuie sur « Parler ».";
+  $("result").hidden = true;
+  $("btnPrev").disabled = state.i===0;
+  $("btnNext").textContent = state.i>=current.s.length-1 ? "Terminer la leçon ✓" : "Suivante →";
+  save(); show("Train");
+}
+function showResult(){
+  const s=current.s[state.i], words=s.split(" "), heard=heardText.trim();
+  if(!heard){ $("heard").textContent="Je n'ai rien entendu. Rapproche le téléphone et réessaie."; return; }
+  const {ok,said}=compare(words,heard);
+  $("sentence").querySelectorAll(".w").forEach((sp,i)=>{ sp.classList.toggle("ok",ok[i]); sp.classList.toggle("bad",!ok[i]); });
+  const pct=Math.round(100*ok.filter(Boolean).length/words.length);
+  const h=$("heard"); h.textContent=""; const b=document.createElement("b"); b.textContent=heard; h.append("Compris : ",b);
+  $("score").textContent = pct===100 ? "100 % : parfait 👏" : pct>=85 ? `${pct} % : réussi. Corrige les mots rouges si tu veux` : `${pct} % : réécoute les mots rouges et recommence`;
+  const k=key(s); if(pct>(results[k]||0)) results[k]=pct;
+  const ul=$("fixes"); ul.textContent="";
+  words.forEach((w,i)=>{ if(ok[i]) return; const clean=w.replace(/[^A-Za-z0-9'’-]/g,""); if(!clean) return;
+    const li=document.createElement("li");
+    const a=document.createElement("span"); a.className="say"; a.textContent=clean;
+    const sm=document.createElement("small"); sm.textContent = said[i] ? `entendu : « ${said[i]} »` : "pas entendu (oublié ou avalé)";
+    const bt=document.createElement("button"); bt.className="btn small"; bt.textContent="🔊 Écouter"; bt.onclick=()=>say(clean,0.7);
+    li.append(a,sm,bt); ul.append(li); });
+  $("result").hidden=false;
+  const done=current.s.filter(x=>(results[key(x)]||0)>=85).length;
+  $("barFill").style.width=(100*done/current.s.length)+"%";
+  save();
+}
+function endLesson(){
+  const scores=current.s.map(x=>results[key(x)]||0);
+  const okN=scores.filter(v=>v>=85).length;
+  $("endTitle").textContent = `${lessonLabel()} : ${current.title}`;
+  $("endScore").textContent = `${okN} / ${current.s.length} réussies`;
+  $("endMsg").textContent = okN===current.s.length ? "Toutes les phrases sont réussies. Passe à la suite !" : okN>=7 ? "Très bien. Tu peux refaire les ratées ou continuer." : "Refais les phrases ratées avant de continuer, ça vaut le coup.";
+  state.retry = current.s.filter((x,i)=>scores[i]<85);
+  $("btnRetryMissed").hidden = !state.retry.length;
+  let nextLabel="Leçon suivante →";
+  if(state.mode==="mix") nextLabel="Nouvelle série au hasard →";
+  else if(state.mode==="script") nextLabel = (state.part||0)+1 < Math.ceil(splitSentences(script).length/10) ? "Partie suivante du script →" : "Retour aux leçons →";
+  else if(state.mode==="lesson" && state.lesson>=LESSONS.length-1) nextLabel="Révision au hasard →";
+  else if(state.mode==="retry") nextLabel="Continuer →";
+  $("btnNextLesson").textContent=nextLabel;
+  save(); show("End");
+}
+function nextLesson(){
+  if(state.mode==="mix"){ state.mix=null; }
+  else if(state.mode==="script"){ const parts=Math.ceil(splitSentences(script).length/10); state.part=(state.part||0)+1; if(state.part>=parts){ state.mode="lesson"; state.part=0; } }
+  else if(state.mode==="retry"){ state.mode = state.back||"lesson"; if(state.mode==="lesson") state.lesson=Math.min(state.lesson+1, LESSONS.length-1); if(state.mode==="mix") state.mix=null; }
+  else { if(state.lesson>=LESSONS.length-1){ state.mode="mix"; state.mix=null; } else state.lesson++; }
+  state.i=0; render();
+}
+function renderList(){
+  const box=$("lessonList"); box.textContent="";
+  LESSONS.forEach((L,n)=>{ const okN=L.s.filter(x=>(results[key(x)]||0)>=85).length;
+    const b=document.createElement("button"); if(okN===L.s.length) b.classList.add("done"); if(state.mode==="lesson"&&state.lesson===n) b.classList.add("cur");
+    const t=document.createElement("span"); t.textContent=`${n+1}. ${L.title}`;
+    const st=document.createElement("span"); st.className="st"; st.textContent = okN===L.s.length ? "✓ terminée" : okN ? `${okN}/10` : "";
+    b.append(t,st); b.onclick=()=>{ state.mode="lesson"; state.lesson=n; state.i=0; render(); }; box.append(b); });
+  const m=document.createElement("button"); const mt=document.createElement("span"); mt.textContent="🔀 Révision au hasard (sans fin)"; m.append(mt);
+  m.onclick=()=>{ state.mode="mix"; state.mix=null; state.i=0; render(); }; box.append(m);
+  show("List");
+}
+
+/* ---------- voice (phone's own) ---------- */
+let voice=null;
+function pickVoice(){ const vs=speechSynthesis.getVoices();
+  voice = vs.find(v=>/en[-_]US/i.test(v.lang)&&/google/i.test(v.name)) || vs.find(v=>/en[-_]US/i.test(v.lang)) || vs.find(v=>/^en/i.test(v.lang)) || null; }
+if("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+function say(text,r){
+  if(!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang="en-US"; u.rate=r??rate; if(voice) u.voice=voice; speechSynthesis.speak(u);
+}
+
+/* ---------- listening (phone's own) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function setRec(on){ recording=on; const b=$("btnRec"); b.classList.toggle("rec",on); b.textContent=on?"⏹ J'ai fini":"🎙 Parler"; }
+function startRec(){
+  if("speechSynthesis" in window) speechSynthesis.cancel();
+  heardText=""; $("result").hidden=true;
+  $("sentence").querySelectorAll(".w").forEach(sp=>sp.classList.remove("ok","bad"));
+  $("heard").textContent="Je t'écoute… lis la phrase.";
+  rec = new SR(); rec.lang="en-US"; rec.interimResults=true; rec.continuous=true; rec.maxAlternatives=1;
+  let finals="";
+  rec.onresult = e=>{ let interim=""; finals="";
+    for(let i=0;i<e.results.length;i++){ const r=e.results[i]; if(r.isFinal) finals+=" "+r[0].transcript; else interim+=" "+r[0].transcript; }
+    heardText=(finals+" "+interim).trim();
+    const h=$("heard"); h.textContent=""; const b=document.createElement("b"); b.textContent=finals.trim(); const sp=document.createElement("span"); sp.className="live"; sp.textContent=" "+interim.trim(); h.append(b,sp); };
+  rec.onerror = e=>{ const msg={"not-allowed":"Le micro est refusé. Autorise le micro pour ce site dans Chrome (cadenas à gauche de l'adresse).","service-not-allowed":"Le micro est refusé. Autorise le micro pour ce site dans Chrome.","no-speech":"Je n'ai rien entendu. Appuie sur « Parler » et lis la phrase.","network":"Pas de connexion Internet : la reconnaissance vocale en a besoin.","audio-capture":"Aucun micro trouvé."}[e.error];
+    if(msg){ setRec(false); $("heard").textContent=msg; heardText="__err"; } };
+  rec.onend = ()=>{ if(heardText==="__err"){ heardText=""; return; } if(recording){ setRec(false); showResult(); } };
+  try{ rec.start(); setRec(true); }catch(e){ setRec(false); $("heard").textContent="Le micro n'a pas démarré. Réessaie."; }
+}
+$("btnRec").onclick=()=>{
+  if(!SR) return;
+  if(recording){ try{ rec.stop(); }catch(e){ setRec(false); showResult(); } return; }
+  startRec();
+};
+if(!SR){ $("btnRec").disabled=true; const w=$("warnMic"); w.hidden=false;
+  w.textContent="Ce navigateur ne sait pas écouter. Ouvre cette page dans Google Chrome sur ton téléphone Android. Tu peux quand même écouter les phrases ici."; }
+
+/* ---------- buttons ---------- */
+$("btnListen").onclick=()=>say(current.s[state.i]);
+$("btnSlow").onclick=()=>say(current.s[state.i],0.65);
+$("btnPrev").onclick=()=>{ if(state.i>0){ state.i--; render(); } };
+$("btnNext").onclick=()=>{ if(state.i<current.s.length-1){ state.i++; render(); } else endLesson(); };
+$("btnNextLesson").onclick=nextLesson;
+$("btnRetryMissed").onclick=()=>{ if(state.mode!=="retry") state.back=state.mode; state.mode="retry"; state.i=0; render(); };
+$("btnRestart").onclick=()=>{ current.s.forEach(x=>delete results[key(x)]); state.i=0; render(); };
+$("rate").value=rate; $("rateVal").textContent=rate;
+$("rate").oninput=e=>{ rate=parseFloat(e.target.value); $("rateVal").textContent=rate; store.set("coach_rate",rate); };
+$("tabTrain").onclick=()=>render();
+$("tabList").onclick=renderList;
+$("tabScript").onclick=()=>{ $("scriptBox").value=script; show("Script"); };
+$("btnClear").onclick=()=>{ $("scriptBox").value=""; };
+$("btnUse").onclick=()=>{ const v=$("scriptBox").value.trim(); if(!v) return; script=v; store.set("coach_script",v); state.mode="script"; state.part=0; state.i=0; render(); };
+
+render();
+</script>
+</body>
+</html>
