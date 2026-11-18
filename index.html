@@ -14,13 +14,14 @@
   --bg:#eef2f0; --card:#ffffff; --fg:#14211c; --muted:#5d6d66; --line:#d5ddd9;
   --accent:#0f7a55; --accent-ink:#ffffff; --tip:#e6f1ec;
   --ok:#137a3a; --ok-bg:#dcf3e4; --bad:#b3261e; --bad-bg:#fbe1de; --live:#8a6d00;
+  --near:#9a5a00; --near-bg:#fdecc8;
   --display:"Poppins",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#0f1714; --card:#17221e; --fg:#eaf2ee; --muted:#9db0a8; --line:#2a3832;
   --accent:#3fcf94; --accent-ink:#06130d; --tip:#1d2e27;
-  --ok:#5fe39a; --ok-bg:#163a27; --bad:#ff8a80; --bad-bg:#43201d; --live:#f2cf5b; color-scheme:dark}}
+  --ok:#5fe39a; --ok-bg:#163a27; --bad:#ff8a80; --bad-bg:#43201d; --live:#f2cf5b; --near:#ffc061; --near-bg:#3d2c10; color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.45;
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -43,6 +44,9 @@ h1{font-family:var(--display);font-size:1.2rem;margin:0;font-weight:700}
 .sentence{font-family:var(--display);font-weight:600;font-size:clamp(1.7rem,7vw,2.4rem);line-height:1.35;margin:0;text-wrap:balance}
 .w{border-radius:8px;padding:0 .12em;cursor:pointer}
 .w.ok{background:var(--ok-bg);color:var(--ok)}
+.w.near{background:var(--near-bg);color:var(--near)}
+.fixes li.near{background:var(--near-bg)}
+.fixes li.near .say{color:var(--near)}
 .w.bad{background:var(--bad-bg);color:var(--bad);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
 .heard{font-size:1rem;color:var(--muted);min-height:1.5em}
 .heard b{color:var(--fg);font-weight:600}
@@ -115,7 +119,7 @@ textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;bord
       <button class="btn small" id="btnNext">Suivante →</button>
     </div>
     <div class="speed"><label for="rate">Vitesse de la voix</label><input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="0.85"><span id="rateVal"></span></div>
-    <p class="hint">Touche un mot pour l'entendre seul. Une phrase est réussie à partir de 85 %.</p>
+    <p class="hint">Vert = compris. Orange = presque bon (un mot qui sonne pareil). Rouge = pas compris. Touche un mot pour l'entendre seul. Une phrase est réussie à partir de 85 %.</p>
     <p class="hint" id="engineStatus"></p>
   </section>
 
@@ -135,8 +139,8 @@ textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;bord
     <div class="list" id="lessonList"></div>
     <div class="speed"><label for="engine">Moteur d'écoute</label>
       <select id="engine" class="btn small" style="flex:1">
-        <option value="whisper">Whisper (précis, recommandé)</option>
-        <option value="google">Google (rapide, plus strict)</option>
+        <option value="google">Google (rapide, écrit en direct)</option>
+        <option value="whisper">Whisper (plus lent, téléchargement 80 Mo)</option>
       </select></div>
   </section>
 
@@ -232,7 +236,9 @@ function hardSentences(){
 const norm = w => w.toLowerCase().replace(/[’]/g,"'").replace(/[^a-z0-9']/g,"");
 const NUM = {"0":"zero","1":"one","2":"two","3":"three","4":"four","5":"five","6":"six","7":"seven","8":"eight","9":"nine","10":"ten","11":"eleven","12":"twelve","13":"thirteen","15":"fifteen","19":"nineteen","30":"thirty","50":"fifty","90":"ninety"};
 const EXPAND = {"it's":["it","is"],"that's":["that","is"],"here's":["here","is"],"there's":["there","is"],"what's":["what","is"],"he's":["he","is"],"she's":["she","is"],"let's":["let","us"],"i'm":["i","am"],"i'll":["i","will"],"you'll":["you","will"],"we'll":["we","will"],"i've":["i","have"],"won't":["will","not"],"don't":["do","not"],"can't":["can","not"],"couldn't":["could","not"],"isn't":["is","not"],"doesn't":["does","not"],"didn't":["did","not"],"we're":["we","are"],"they're":["they","are"],"you're":["you","are"]};
-function toks(word){ let n=norm(word); if(NUM[n]) n=NUM[n]; return EXPAND[n] || [n]; }
+// Words that sound exactly the same: no microphone can tell them apart, so they count as correct.
+const HOMO = {write:"right",two:"to",too:"to",their:"there",one:"won",here:"hear",knew:"new",know:"no",four:"for",buy:"by",bye:"by",week:"weak",hole:"whole",sea:"see",sun:"son",weight:"wait",red:"read",ate:"eight",meat:"meet",brake:"break",fare:"fair",rode:"road",maid:"made",passed:"past",peace:"piece",wear:"where",weather:"whether",allowed:"aloud",scene:"seen",steal:"steel",tail:"tale"};
+function toks(word){ let n=norm(word); if(NUM[n]) n=NUM[n]; return (EXPAND[n] || [n]).map(t=>HOMO[t]||t); }
 function compare(words, heard){
   const exp=[]; words.forEach((w,i)=>toks(w).forEach(t=>{ if(t) exp.push({t,i}) }));
   const hw=[]; heard.split(/\s+/).forEach(w=>toks(w).forEach(t=>{ if(t) hw.push(t) }));
@@ -246,6 +252,13 @@ function compare(words, heard){
     const nx=pairs.find(q=>q[0]>x); const end=nx?nx[1]:m; if(!said[exp[x].i]) said[exp[x].i]=hw.slice(prevB+1,end).join(" "); }
   return {ok,said};
 }
+function lev(a,b){ const d=Array.from({length:a.length+1},(_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j;
+  for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return d[a.length][b.length]; }
+const skel = w => w[0] + w.slice(1).replace(/[aeiouy']/g,"").replace(/(.)\1+/g,"$1");
+function similar(a,b){ if(!a||!b) return false; if(a===b) return true;
+  const L=Math.max(a.length,b.length); if(L<=2) return false;
+  return lev(a,b) <= (L<=5?1:2) || (L>3 && skel(a)===skel(b)); }
 const key = s => "k"+[...s].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0);
 
 /* ---------- render ---------- */
@@ -278,17 +291,19 @@ function showResult(){
   const s=current.s[state.i], words=s.split(" "), heard=heardText.trim();
   if(!heard){ $("heard").textContent="Je n'ai rien entendu. Rapproche le téléphone et réessaie."; return; }
   const {ok,said}=compare(words,heard);
-  $("sentence").querySelectorAll(".w").forEach((sp,i)=>{ sp.classList.toggle("ok",ok[i]); sp.classList.toggle("bad",!ok[i]); });
-  const pct=Math.round(100*ok.filter(Boolean).length/words.length);
+  // "presque bon": the recognizer heard a word that sounds almost the same (wins / wings)
+  const near = words.map((w,i)=>!ok[i] && !!said[i] && said[i].split(" ").some(h=>toks(w).some(t=>similar(t,norm(h)))));
+  $("sentence").querySelectorAll(".w").forEach((sp,i)=>{ sp.classList.toggle("ok",ok[i]); sp.classList.toggle("near",near[i]); sp.classList.toggle("bad",!ok[i]&&!near[i]); });
+  const pct=Math.round(100*(ok.filter(Boolean).length + 0.75*near.filter(Boolean).length)/words.length);
   const h=$("heard"); h.textContent=""; const b=document.createElement("b"); b.textContent=heard; h.append("Compris : ",b);
-  $("score").textContent = pct===100 ? "100 % : parfait 👏" : pct>=85 ? `${pct} % : réussi. Corrige les mots rouges si tu veux` : `${pct} % : réécoute les mots rouges et recommence`;
+  $("score").textContent = pct===100 ? "100 % : parfait 👏" : pct>=85 ? `${pct} % : réussi. Travaille les mots en couleur si tu veux` : `${pct} % : réécoute les mots rouges et recommence`;
   const k=key(s); if(pct>(results[k]||0)) results[k]=pct;
   trackWords(words, ok);
   const ul=$("fixes"); ul.textContent="";
   words.forEach((w,i)=>{ if(ok[i]) return; const clean=w.replace(/[^A-Za-z0-9'’-]/g,""); if(!clean) return;
-    const li=document.createElement("li");
+    const li=document.createElement("li"); if(near[i]) li.classList.add("near");
     const a=document.createElement("span"); a.className="say"; a.textContent=clean;
-    const sm=document.createElement("small"); sm.textContent = said[i] ? `entendu : « ${said[i]} »` : "pas entendu (oublié ou avalé)";
+    const sm=document.createElement("small"); sm.textContent = near[i] ? `presque bon : entendu « ${said[i]} »` : said[i] ? `entendu : « ${said[i]} »` : "pas entendu (oublié ou avalé)";
     const bt=document.createElement("button"); bt.className="btn small"; bt.textContent="🔊 Écouter"; bt.onclick=()=>say(clean,0.7);
     li.append(a,sm,bt); ul.append(li); });
   $("result").hidden=false;
@@ -411,7 +426,7 @@ function startRec(){
   try{ listenOnce(); }catch(e){ setRec(false); $("heard").textContent="Le micro n'a pas démarré. Réessaie."; }
 }
 /* ---------- Whisper: records the voice, then the same engine as the PC tests reads it, inside the phone ---------- */
-let engine = store.get("coach_engine","whisper");
+let engine = store.get("coach_engine2","google");
 let mr=null, mrStream=null, mrTimer=null, busy=false;
 function engineStatus(t){ $("engineStatus").textContent=t; }
 function decodeTo16k(ab){
@@ -457,7 +472,7 @@ window.onWhisperProgress = (pct, ready, err)=>{
   engineStatus(ready ? "Écoute : Whisper, prêt ✓" : `Préparation de l'écoute Whisper : ${pct} % (seulement la 1re fois, environ 80 Mo, de préférence en Wi-Fi)`);
 };
 $("engine").value=engine;
-$("engine").onchange=e=>{ engine=e.target.value; store.set("coach_engine",engine); if(engine==="whisper"){ window.WH&&WH.load(); } else engineStatus("Écoute : Google"); };
+$("engine").onchange=e=>{ engine=e.target.value; store.set("coach_engine2",engine); if(engine==="whisper"){ window.WH&&WH.load(); } else engineStatus("Écoute : Google"); };
 
 $("btnRec").onclick=()=>{
   if(engine==="whisper") return recordWhisper();
@@ -514,7 +529,7 @@ window.WH = {
     return (out && out.text) || "";
   }
 };
-if((function(){ try{ return JSON.parse(localStorage.getItem("coach_engine")||'"whisper"'); }catch(e){ return "whisper"; } })()==="whisper"){
+if((function(){ try{ return JSON.parse(localStorage.getItem("coach_engine2")||'"google"'); }catch(e){ return "google"; } })()==="whisper"){
   window.onWhisperProgress && window.onWhisperProgress(0,false,false);
   window.WH.load().catch(()=>{});
 }
