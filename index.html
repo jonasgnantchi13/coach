@@ -68,6 +68,8 @@ h1{font-family:var(--display);font-size:1.2rem;margin:0;font-weight:700}
 .list button .st{font-size:.85rem;color:var(--muted);white-space:nowrap}
 .list button.done .st{color:var(--ok);font-weight:600}
 .list button.cur{border-color:var(--accent);border-width:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.list .chips button.chip{font:600 .9rem var(--body);padding:6px 10px;border-radius:999px;background:var(--bad-bg);color:var(--bad);border:none}
 textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
 .hint{color:var(--muted);font-size:.92rem;margin:0}
 .speed{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.92rem}
@@ -128,7 +130,7 @@ textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;bord
   </section>
 
   <section id="viewList" class="card" hidden>
-    <p class="hint">Choisis une leçon. Après la dernière, le coach te donne des phrases au hasard, sans fin.</p>
+    <p class="hint">Choisis ce que tu veux travailler. Après la dernière leçon, le coach te donne des phrases nouvelles, sans fin.</p>
     <div class="list" id="lessonList"></div>
   </section>
 
@@ -143,6 +145,7 @@ textarea{width:100%;min-height:220px;font:1rem/1.5 var(--body);padding:12px;bord
 </div>
 
 <script src="phrases.js"></script>
+<script src="generator.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const store = {
@@ -175,6 +178,13 @@ function buildCurrent(){
   } else if(state.mode==="mix"){
     if(!state.mix || !state.mix.length){ state.mix = shuffle(LESSONS.flatMap(l=>l.s)).slice(0,10); }
     current = {title:"Révision au hasard", focus:"10 phrases tirées de toutes les leçons. Une nouvelle série arrive à la fin.", s:state.mix};
+  } else if(state.mode==="gen"){
+    if(!state.gen || !state.gen.length){ state.gen = window.makeSentences(10); state.genN=(state.genN||0)+1; }
+    current = {title:`Phrases nouvelles : série ${state.genN||1}`, focus:"Des phrases fabriquées au hasard : chaque série est différente, sans fin.", s:state.gen};
+  } else if(state.mode==="hard"){
+    if(!state.hard || !state.hard.length){ state.hard = hardSentences(); }
+    if(!state.hard.length){ state.mode="gen"; return buildCurrent(); }
+    current = {title:"Mes mots difficiles", focus:"Des phrases avec les mots que tu rates le plus : "+hardWords().slice(0,6).join(", ")+".", s:state.hard};
   } else {
     const L = LESSONS[state.lesson] || LESSONS[0];
     current = {title:L.title, focus:L.focus, s:L.s};
@@ -186,7 +196,30 @@ function lessonLabel(){
   if(state.mode==="lesson") return `Leçon ${state.lesson+1} / ${LESSONS.length}`;
   if(state.mode==="mix") return "Révision";
   if(state.mode==="retry") return "Rattrapage";
+  if(state.mode==="gen") return "Phrases nouvelles";
+  if(state.mode==="hard") return "Mots difficiles";
   return "Mon script";
+}
+
+/* ---------- words he misses most ---------- */
+let misses = store.get("coach_misses", {});   // word -> {m: missed, o: ok}
+function trackWords(words, ok){
+  words.forEach((w,i)=>{ const n=norm(w); if(n.length<2) return;
+    if(!ok[i]){ (misses[n] ||= {m:0,o:0}).m++; } else if(misses[n]) misses[n].o++; });
+  store.set("coach_misses", misses);
+}
+function hardWords(){
+  return Object.entries(misses).filter(([w,v])=>v.m - v.o*0.5 > 0.4)
+    .sort((a,b)=>(b[1].m-b[1].o*0.5)-(a[1].m-a[1].o*0.5)).map(([w])=>w).slice(0,15);
+}
+function hardSentences(){
+  const hw = hardWords(); if(!hw.length) return [];
+  const re = w => new RegExp("(^|[^a-z'])"+w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"([^a-z']|$)","i");
+  const bank = shuffle(LESSONS.flatMap(l=>l.s).concat(window.makeSentences(300)));
+  const out=[]; const used=new Set();
+  for(const w of hw){ const s = bank.find(x=>!used.has(x) && re(w).test(x)); if(s){ used.add(s); out.push(s); } if(out.length>=10) break; }
+  for(const s of bank){ if(out.length>=10) break; if(!used.has(s) && hw.some(w=>re(w).test(s))){ used.add(s); out.push(s); } }
+  return shuffle(out);
 }
 
 /* ---------- compare ---------- */
@@ -244,6 +277,7 @@ function showResult(){
   const h=$("heard"); h.textContent=""; const b=document.createElement("b"); b.textContent=heard; h.append("Compris : ",b);
   $("score").textContent = pct===100 ? "100 % : parfait 👏" : pct>=85 ? `${pct} % : réussi. Corrige les mots rouges si tu veux` : `${pct} % : réécoute les mots rouges et recommence`;
   const k=key(s); if(pct>(results[k]||0)) results[k]=pct;
+  trackWords(words, ok);
   const ul=$("fixes"); ul.textContent="";
   words.forEach((w,i)=>{ if(ok[i]) return; const clean=w.replace(/[^A-Za-z0-9'’-]/g,""); if(!clean) return;
     const li=document.createElement("li");
@@ -266,21 +300,37 @@ function endLesson(){
   $("btnRetryMissed").hidden = !state.retry.length;
   let nextLabel="Leçon suivante →";
   if(state.mode==="mix") nextLabel="Nouvelle série au hasard →";
+  else if(state.mode==="gen") nextLabel="Nouvelle série de phrases →";
+  else if(state.mode==="hard") nextLabel="Encore mes mots difficiles →";
   else if(state.mode==="script") nextLabel = (state.part||0)+1 < Math.ceil(splitSentences(script).length/10) ? "Partie suivante du script →" : "Retour aux leçons →";
-  else if(state.mode==="lesson" && state.lesson>=LESSONS.length-1) nextLabel="Révision au hasard →";
+  else if(state.mode==="lesson" && state.lesson>=LESSONS.length-1) nextLabel="Phrases nouvelles, sans fin →";
   else if(state.mode==="retry") nextLabel="Continuer →";
   $("btnNextLesson").textContent=nextLabel;
   save(); show("End");
 }
 function nextLesson(){
   if(state.mode==="mix"){ state.mix=null; }
+  else if(state.mode==="gen"){ state.gen=null; }
+  else if(state.mode==="hard"){ state.hard=null; }
   else if(state.mode==="script"){ const parts=Math.ceil(splitSentences(script).length/10); state.part=(state.part||0)+1; if(state.part>=parts){ state.mode="lesson"; state.part=0; } }
-  else if(state.mode==="retry"){ state.mode = state.back||"lesson"; if(state.mode==="lesson") state.lesson=Math.min(state.lesson+1, LESSONS.length-1); if(state.mode==="mix") state.mix=null; }
-  else { if(state.lesson>=LESSONS.length-1){ state.mode="mix"; state.mix=null; } else state.lesson++; }
+  else if(state.mode==="retry"){ state.mode = state.back||"lesson"; if(state.mode==="lesson") state.lesson=Math.min(state.lesson+1, LESSONS.length-1); if(state.mode==="mix") state.mix=null; if(state.mode==="gen") state.gen=null; if(state.mode==="hard") state.hard=null; }
+  else { if(state.lesson>=LESSONS.length-1){ state.mode="gen"; state.gen=null; } else state.lesson++; }
   state.i=0; render();
 }
 function renderList(){
   const box=$("lessonList"); box.textContent="";
+  const special=(icon,label,sub,fn)=>{ const b=document.createElement("button"); b.classList.add("cur");
+    const t=document.createElement("span"); t.textContent=icon+" "+label; const st=document.createElement("span"); st.className="st"; st.textContent=sub;
+    b.append(t,st); b.onclick=fn; box.append(b); };
+  special("✨","Phrases nouvelles","sans fin",()=>{ state.mode="gen"; state.gen=null; state.i=0; render(); });
+  const hw=hardWords();
+  if(hw.length){
+    special("🎯","Mes mots difficiles",hw.length+(hw.length>1?" mots":" mot"),()=>{ state.mode="hard"; state.hard=null; state.i=0; render(); });
+    const chips=document.createElement("div"); chips.className="chips";
+    hw.forEach(w=>{ const c=document.createElement("button"); c.className="chip"; c.textContent="🔊 "+w; c.onclick=()=>say(w,0.7); chips.append(c); });
+    box.append(chips);
+  }
+  const h=document.createElement("p"); h.className="hint"; h.textContent="Les leçons :"; box.append(h);
   LESSONS.forEach((L,n)=>{ const okN=L.s.filter(x=>(results[key(x)]||0)>=85).length;
     const b=document.createElement("button"); if(okN===L.s.length) b.classList.add("done"); if(state.mode==="lesson"&&state.lesson===n) b.classList.add("cur");
     const t=document.createElement("span"); t.textContent=`${n+1}. ${L.title}`;
